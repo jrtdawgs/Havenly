@@ -1,8 +1,8 @@
 'use client';
 
 import { useBudget } from '@/context/BudgetContext';
-import { Settings as SettingsIcon, RefreshCw, Save, Check } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { Settings as SettingsIcon, RefreshCw, Save, Check, Download, Upload } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
 import { BudgetConfig } from '@/types/budget';
 
 export function Settings() {
@@ -10,6 +10,8 @@ export function Settings() {
   const [showConfirmReset, setShowConfirmReset] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const [importStatus, setImportStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Get current fund contributions from savingsFunds
   const emergencyFund = state.savingsFunds.find(f => f.id === 'emergency');
@@ -63,6 +65,48 @@ export function Settings() {
     setFormValues(state.config);
     setCcPayment(state.creditCard.monthlyPayment);
     setHasChanges(false);
+  };
+
+  const handleExport = () => {
+    const data = localStorage.getItem('budget-master-state');
+    if (!data) {
+      alert('No data to export');
+      return;
+    }
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `havenly-backup-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = event.target?.result as string;
+        JSON.parse(data); // Validate JSON
+        localStorage.setItem('budget-master-state', data);
+        setImportStatus('success');
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
+      } catch {
+        setImportStatus('error');
+        setTimeout(() => setImportStatus('idle'), 3000);
+      }
+    };
+    reader.readAsText(file);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const inputClass = "w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white";
@@ -353,6 +397,43 @@ export function Settings() {
             </p>
           </div>
         </div>
+      </div>
+
+      {/* Data Management */}
+      <div className="bg-gray-800/50 rounded-xl border border-gray-700 p-6">
+        <h3 className="text-lg font-semibold text-white mb-2">Data Management</h3>
+        <p className="text-gray-400 text-sm mb-4">
+          Export your data to transfer between devices or create a backup.
+        </p>
+        <div className="flex gap-3 flex-wrap">
+          <button
+            onClick={handleExport}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+          >
+            <Download className="w-4 h-4" />
+            Export Data
+          </button>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+          >
+            <Upload className="w-4 h-4" />
+            Import Data
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json"
+            onChange={handleImport}
+            className="hidden"
+          />
+        </div>
+        {importStatus === 'success' && (
+          <p className="text-green-400 text-sm mt-3">Data imported successfully! Reloading...</p>
+        )}
+        {importStatus === 'error' && (
+          <p className="text-red-400 text-sm mt-3">Invalid file format. Please use a valid backup file.</p>
+        )}
       </div>
 
       {/* Reset */}
