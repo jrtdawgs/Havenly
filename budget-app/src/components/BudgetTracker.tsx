@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useBudget } from '@/context/BudgetContext';
 import { BudgetCategory, CustomCategory } from '@/types/budget';
 import { ProgressBar } from '@/components/ui/ProgressBar';
@@ -21,6 +21,9 @@ import {
   Check,
   X,
   Tag,
+  ChevronLeft,
+  ChevronRight,
+  Calendar,
 } from 'lucide-react';
 
 interface CategoryConfig {
@@ -79,7 +82,21 @@ export function BudgetTracker() {
   const { config, creditCard, budgetTransactions, customCategories, monthlyBudgetOverrides } = state;
 
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth());
+  const [showMonthPicker, setShowMonthPicker] = useState(false);
+  const [pickerYear, setPickerYear] = useState(new Date().getFullYear());
+  const monthPickerRef = useRef<HTMLDivElement>(null);
   const [showForm, setShowForm] = useState(false);
+
+  // Close month picker when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (monthPickerRef.current && !monthPickerRef.current.contains(event.target as Node)) {
+        setShowMonthPicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     description: '',
@@ -214,26 +231,6 @@ export function BudgetTracker() {
     }
   };
 
-  // Get available months for selector (past 12 months through 2050)
-  const getMonthRange = () => {
-    const months: string[] = [];
-    const now = new Date();
-    const startDate = new Date(now.getFullYear(), now.getMonth() - 12, 1);
-    const endDate = new Date(2050, 11, 1); // December 2050
-
-    let current = new Date(startDate);
-    while (current <= endDate) {
-      months.push(`${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}`);
-      current.setMonth(current.getMonth() + 1);
-    }
-    return months;
-  };
-
-  const availableMonths = [...new Set([
-    ...getMonthRange(),
-    ...budgetTransactions.map(t => t.month)
-  ])].sort().reverse();
-
   const handleAdd = () => {
     if (formData.description && formData.amount) {
       addBudgetTransaction({
@@ -284,15 +281,80 @@ export function BudgetTracker() {
             <Receipt className="w-6 h-6 text-green-400" />
             <h2 className="text-xl font-bold text-white">Monthly Budget</h2>
           </div>
-          <select
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            className="bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white"
-          >
-            {availableMonths.map(month => (
-              <option key={month} value={month}>{getMonthLabel(month)}</option>
-            ))}
-          </select>
+          <div className="relative" ref={monthPickerRef}>
+            <button
+              onClick={() => {
+                setShowMonthPicker(!showMonthPicker);
+                setPickerYear(parseInt(selectedMonth.split('-')[0]));
+              }}
+              className="bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white flex items-center gap-2 hover:bg-gray-600"
+            >
+              <Calendar className="w-4 h-4" />
+              {getMonthLabel(selectedMonth)}
+            </button>
+
+            {showMonthPicker && (
+              <div className="absolute right-0 top-full mt-2 bg-gray-800 border border-gray-600 rounded-lg p-3 shadow-xl z-50 w-64">
+                {/* Year Navigation */}
+                <div className="flex items-center justify-between mb-3">
+                  <button
+                    onClick={() => setPickerYear(pickerYear - 1)}
+                    className="p-1 hover:bg-gray-700 rounded"
+                  >
+                    <ChevronLeft className="w-5 h-5 text-gray-400" />
+                  </button>
+                  <span className="text-white font-semibold">{pickerYear}</span>
+                  <button
+                    onClick={() => setPickerYear(pickerYear + 1)}
+                    className="p-1 hover:bg-gray-700 rounded"
+                  >
+                    <ChevronRight className="w-5 h-5 text-gray-400" />
+                  </button>
+                </div>
+
+                {/* Month Grid */}
+                <div className="grid grid-cols-3 gap-2">
+                  {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((month, index) => {
+                    const monthValue = `${pickerYear}-${String(index + 1).padStart(2, '0')}`;
+                    const isSelected = monthValue === selectedMonth;
+                    const isCurrentMonth = monthValue === getCurrentMonth();
+
+                    return (
+                      <button
+                        key={month}
+                        onClick={() => {
+                          setSelectedMonth(monthValue);
+                          setShowMonthPicker(false);
+                        }}
+                        className={`px-2 py-2 rounded text-sm transition-colors ${
+                          isSelected
+                            ? 'bg-green-600 text-white'
+                            : isCurrentMonth
+                            ? 'bg-gray-600 text-white ring-1 ring-green-500'
+                            : 'text-gray-300 hover:bg-gray-700'
+                        }`}
+                      >
+                        {month}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Quick Actions */}
+                <div className="mt-3 pt-3 border-t border-gray-700">
+                  <button
+                    onClick={() => {
+                      setSelectedMonth(getCurrentMonth());
+                      setShowMonthPicker(false);
+                    }}
+                    className="w-full text-sm text-green-400 hover:text-green-300"
+                  >
+                    Go to Current Month
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Overall Progress */}
