@@ -214,7 +214,7 @@ export function BudgetTracker() {
 
   // Quick add transaction handler
   const handleQuickAdd = (category: BudgetCategory) => {
-    if (quickAddData.description && quickAddData.amount) {
+    if (quickAddData.amount) {
       // Use selected month, default to today's date if current month, otherwise first of month
       const today = new Date().toISOString().split('T')[0];
       const currentMonth = today.slice(0, 7);
@@ -232,7 +232,7 @@ export function BudgetTracker() {
   };
 
   const handleAdd = () => {
-    if (formData.description && formData.amount) {
+    if (formData.amount) {
       addBudgetTransaction({
         date: formData.date,
         description: formData.description,
